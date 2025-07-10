@@ -26,10 +26,15 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import { useStoreUserEffect } from "./useStoreUserEffect";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 
 export default function Home() {
-  const [email, setEmail] = useState("");
+  const { isLoading, isAuthenticated } = useStoreUserEffect();
   const router = useRouter();
+
+  if (isLoading) return <div>Loading...</div>;
 
   const features = [
     {
@@ -271,8 +276,6 @@ export default function Home() {
             <Input
               type="email"
               placeholder="メールアドレスを入力"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               className="flex-1"
             />
             <Button
