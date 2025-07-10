@@ -18,9 +18,18 @@ import {
   SparklesIcon,
 } from "@heroicons/react/24/outline";
 import { useState } from "react";
+import {
+  SignedIn,
+  SignedOut,
+  SignInButton,
+  SignUpButton,
+  UserButton,
+} from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
   const [email, setEmail] = useState("");
+  const router = useRouter();
 
   const features = [
     {
@@ -100,9 +109,23 @@ export default function Home() {
             >
               お客様の声
             </a>
-            <Button color="primary" variant="flat">
-              無料で始める
-            </Button>
+            <SignedOut>
+              <SignUpButton mode="modal">
+                <Button color="primary" variant="flat">
+                  無料で始める
+                </Button>
+              </SignUpButton>
+            </SignedOut>
+            <SignedIn>
+              <UserButton />
+              <Button
+                color="primary"
+                variant="flat"
+                onClick={() => router.push("/dashboard")}
+              >
+                ダッシュボードへ
+              </Button>
+            </SignedIn>
           </div>
         </nav>
       </header>
@@ -130,9 +153,23 @@ export default function Home() {
             複雑な文書も簡単に理解し、効率的なワークフローを実現します。
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button size="lg" color="primary" className="w-full sm:w-auto">
-              無料で試す
-            </Button>
+            <SignedOut>
+              <SignUpButton mode="modal">
+                <Button size="lg" color="primary" className="w-full sm:w-auto">
+                  無料で試す
+                </Button>
+              </SignUpButton>
+            </SignedOut>
+            <SignedIn>
+              <Button
+                size="lg"
+                color="primary"
+                className="w-full sm:w-auto"
+                onClick={() => router.push("/dashboard")}
+              >
+                ダッシュボードへ
+              </Button>
+            </SignedIn>
             <Button size="lg" variant="bordered" className="w-full sm:w-auto">
               デモを見る
             </Button>
