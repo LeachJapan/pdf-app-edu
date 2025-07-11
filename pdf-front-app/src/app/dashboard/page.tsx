@@ -12,6 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
 import { useStoreUserEffect } from "../useStoreUserEffect";
+import { Id } from "../../../convex/_generated/dataModel";
 
 function Sidebar() {
   return (
@@ -156,6 +157,149 @@ function PdfList({ refreshKey }: { refreshKey: number }) {
   );
 }
 
+function ChatSection() {
+  // スレッド一覧・作成
+  const threads = useQuery(api.tasks.listThreads, {});
+  const createThread = useMutation(api.tasks.createThread);
+  const [newThreadTitle, setNewThreadTitle] = useState("");
+  const [selectedThread, setSelectedThread] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  // メッセージ送信・取得
+  const messages = useQuery(
+    api.tasks.listMessages,
+    selectedThread ? { threadId: selectedThread as Id<"threads"> } : "skip"
+  );
+  const sendMessage = useMutation(api.tasks.sendMessage);
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const messageInputRef = useRef<HTMLInputElement>(null);
+
+  // スレッド作成
+  const handleCreateThread = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newThreadTitle.trim()) return;
+    setCreating(true);
+    try {
+      const id = await createThread({ title: newThreadTitle });
+      setNewThreadTitle("");
+      setSelectedThread(id);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // メッセージ送信
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!message.trim() || !selectedThread) return;
+    setSending(true);
+    try {
+      await sendMessage({
+        threadId: selectedThread as Id<"threads">,
+        text: message,
+      });
+      setMessage("");
+      messageInputRef.current?.focus();
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Card className="max-w-2xl mx-auto mt-12">
+      <CardBody>
+        <div className="flex gap-8">
+          {/* スレッド一覧 */}
+          <div className="w-1/3 border-r pr-4">
+            <div className="font-bold mb-2">スレッド</div>
+            <form onSubmit={handleCreateThread} className="flex gap-2 mb-4">
+              <Input
+                size="sm"
+                placeholder="新しいスレッド名"
+                value={newThreadTitle}
+                onChange={(e) => setNewThreadTitle(e.target.value)}
+              />
+              <Button size="sm" type="submit" isLoading={creating}>
+                作成
+              </Button>
+            </form>
+            <ul className="space-y-1">
+              {threads === undefined ? (
+                <li>読み込み中...</li>
+              ) : threads.length === 0 ? (
+                <li className="text-gray-400 text-sm">スレッドなし</li>
+              ) : (
+                threads.map((thread: any) => (
+                  <li key={thread._id}>
+                    <Button
+                      size="sm"
+                      variant={
+                        selectedThread === thread._id ? "solid" : "light"
+                      }
+                      className="w-full justify-start"
+                      onClick={() => setSelectedThread(thread._id)}
+                    >
+                      {thread.title}
+                    </Button>
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+          {/* メッセージエリア */}
+          <div className="flex-1 flex flex-col">
+            <div className="font-bold mb-2">チャット</div>
+            <div className="flex-1 overflow-y-auto mb-2 max-h-64 border rounded p-2 bg-gray-50">
+              {selectedThread === null ? (
+                <div className="text-gray-400 text-sm">
+                  スレッドを選択してください
+                </div>
+              ) : messages === undefined ? (
+                <div>読み込み中...</div>
+              ) : messages.length === 0 ? (
+                <div className="text-gray-400 text-sm">メッセージなし</div>
+              ) : (
+                <ul className="space-y-2">
+                  {messages.map((msg: any) => (
+                    <li key={msg._id} className="flex items-start gap-2">
+                      <span className="font-bold text-blue-600">
+                        {msg.userId.slice(-4)}
+                      </span>
+                      <span className="flex-1">{msg.text}</span>
+                      <span className="text-gray-400 text-xs">
+                        {new Date(msg.createdAt).toLocaleTimeString()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {/* メッセージ送信フォーム */}
+            <form onSubmit={handleSendMessage} className="flex gap-2 mt-2">
+              <Input
+                ref={messageInputRef}
+                size="sm"
+                placeholder="メッセージを入力"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                disabled={!selectedThread}
+              />
+              <Button
+                size="sm"
+                type="submit"
+                isLoading={sending}
+                disabled={!selectedThread}
+              >
+                送信
+              </Button>
+            </form>
+          </div>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
 export default function Dashboard() {
   const [refreshKey, setRefreshKey] = useState(0);
   const { isLoading, isAuthenticated } = useStoreUserEffect();
@@ -175,6 +319,7 @@ export default function Dashboard() {
         <main className="flex-1 p-8 overflow-y-auto">
           <PdfUploadForm onUploaded={() => setRefreshKey((k) => k + 1)} />
           <PdfList refreshKey={refreshKey} />
+          <ChatSection />
         </main>
       </div>
     </div>

@@ -12,4 +12,15 @@ export default defineSchema({
     storageId: v.string(),
     createdAt: v.number(),
   }).index("by_user", ["userId"]),
+  threads: defineTable({
+    title: v.string(),
+    userId: v.id("users"),
+    createdAt: v.number(),
+  }).index("by_user", ["userId"]),
+  messages: defineTable({
+    threadId: v.id("threads"),
+    userId: v.id("users"),
+    text: v.string(),
+    createdAt: v.number(),
+  }).index("by_thread", ["threadId"]),
 });
