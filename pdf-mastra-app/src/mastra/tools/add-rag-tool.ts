@@ -5,7 +5,12 @@ import * as path from "path";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { MDocument } from "@mastra/rag";
 import { LibSQLVector } from "@mastra/libsql";
-import { geminiEmbeddings, geminiEmbeddingsDim, geminiFlash } from "../models";
+import {
+  geminiEmbeddings,
+  geminiEmbeddingsDim,
+  geminiFlash,
+  dbPath,
+} from "../models";
 
 export const addRagTool = createTool({
   id: "add-rag",
@@ -74,11 +79,7 @@ const addPdfToRag = async (filePath: string, title?: string) => {
 
   // LibSQLVectorの初期化
   const store = new LibSQLVector({
-    connectionUrl: "file:rag.db", // 必要に応じて変更
-  });
-  await store.createIndex({
-    indexName: "pdf_chunks",
-    dimension: geminiEmbeddingsDim, // Gemini埋め込みの次元数
+    connectionUrl: dbPath, // 必ず絶対パスを使う
   });
 
   // sectionからページ番号を抽出する関数

@@ -11,12 +11,19 @@ export default defineSchema({
     fileName: v.string(),
     storageId: v.string(),
     createdAt: v.number(),
+    ragSummary: v.optional(v.string()),
+    ragKeywords: v.optional(v.array(v.string())),
+    ragEmbedding: v.optional(v.array(v.float64())),
+    lastRagUpdatedAt: v.optional(v.number()),
   }).index("by_user", ["userId"]),
   threads: defineTable({
     title: v.string(),
     userId: v.id("users"),
+    pdfId: v.id("pdfs"),
     createdAt: v.number(),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_pdf", ["userId", "pdfId"]),
   messages: defineTable({
     threadId: v.id("threads"),
     userId: v.id("users"),

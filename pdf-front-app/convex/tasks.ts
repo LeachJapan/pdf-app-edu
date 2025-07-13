@@ -1,5 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
+import { api } from "./_generated/api";
 
 // 一時アップロードURL発行
 export const generateUploadUrl = mutation({
@@ -16,6 +18,12 @@ export const savePdf = mutation({
     fileName: v.string(),
   },
   handler: async (ctx, args) => {
+    console.log("[savePdf] called", {
+      fileName: args.fileName,
+      storageId: args.storageId,
+    });
+    console.log(process.env);
+
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("認証が必要です");
     // ユーザー取得
@@ -33,7 +41,41 @@ export const savePdf = mutation({
       storageId: args.storageId,
       createdAt: Date.now(),
     });
+    console.log("[savePdf] PDF saved in DB", { id });
+    // Convex Storageの署名付きURLを取得
+    const url = await ctx.storage.getUrl(args.storageId);
+    if (!url) throw new Error("署名付きURLの取得に失敗しました");
+    // Mastra Workflow APIをActionで非同期スケジューリング
+    console.log("[savePdf] callMastraWorkflow", { url, pdfId: id });
+    await ctx.scheduler.runAfter(0, api.actions.callMastraWorkflow, {
+      url,
+      pdfId: id,
+    });
+    console.log("[savePdf] completed", { id });
     return id;
+  },
+});
+
+// RAGメタ情報を更新
+export const updatePdfRagMeta = mutation({
+  args: {
+    pdfId: v.id("pdfs"),
+    ragSummary: v.optional(v.string()),
+    ragKeywords: v.optional(v.array(v.string())),
+    ragEmbedding: v.optional(v.array(v.float64())),
+    lastRagUpdatedAt: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    console.log("[updatePdfRagMeta] called", args);
+    await ctx.db.patch(args.pdfId, {
+      ragSummary: args.ragSummary,
+      ragKeywords: args.ragKeywords,
+      ragEmbedding: args.ragEmbedding,
+      lastRagUpdatedAt: args.lastRagUpdatedAt,
+    });
+    const updated = await ctx.db.get(args.pdfId);
+    console.log("[updatePdfRagMeta] after patch", updated);
+    return args.pdfId;
   },
 });
 
@@ -68,7 +110,7 @@ export const listPdfs = query({
 
 // スレッド作成
 export const createThread = mutation({
-  args: { title: v.string() },
+  args: { title: v.string(), pdfId: v.id("pdfs") },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("認証が必要です");
@@ -82,6 +124,7 @@ export const createThread = mutation({
     const id = await ctx.db.insert("threads", {
       title: args.title,
       userId: user._id,
+      pdfId: args.pdfId,
       createdAt: Date.now(),
     });
     return id;
@@ -90,8 +133,8 @@ export const createThread = mutation({
 
 // スレッド一覧取得
 export const listThreads = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { pdfId: v.optional(v.id("pdfs")) },
+  handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("認証が必要です");
     const user = await ctx.db
@@ -101,11 +144,21 @@ export const listThreads = query({
       )
       .unique();
     if (!user) throw new Error("ユーザーが見つかりません");
-    return await ctx.db
+    let q = ctx.db
       .query("threads")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .order("desc")
-      .collect();
+      .withIndex("by_user", (q) => q.eq("userId", user._id));
+    if (typeof args.pdfId !== "undefined") {
+      return await ctx.db
+        .query("threads")
+        .withIndex("by_user_pdf", (q) =>
+          q
+            .eq("userId", user._id)
+            .eq("pdfId", args.pdfId as unknown as Id<"pdfs">)
+        )
+        .order("desc")
+        .collect();
+    }
+    return await q.order("desc").collect();
   },
 });
 

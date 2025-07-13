@@ -1,7 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { LibSQLVector } from "@mastra/libsql";
-import { geminiEmbeddings } from "../models";
+import { geminiEmbeddings, dbPath } from "../models";
 
 export const ragSearchTool = createTool({
   id: "rag-search",
@@ -31,7 +31,7 @@ export const ragSearchTool = createTool({
     const queryVector = embeddingResult.embeddings[0];
 
     // 2. ベクトルDBから類似チャンクを検索
-    const store = new LibSQLVector({ connectionUrl: "file:rag.db" });
+    const store = new LibSQLVector({ connectionUrl: dbPath });
     const results = await store.query({
       indexName: "pdf_chunks",
       queryVector,

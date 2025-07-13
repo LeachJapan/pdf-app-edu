@@ -4,6 +4,7 @@ import { ragSearchTool } from "../tools/rag-search-tool";
 import { downloadPdfTool } from "../tools/download-pdf-tool";
 import { addRagTool } from "../tools/add-rag-tool";
 import { pdfAgent } from "../agents/pdf-agent";
+import { updatePdfRagMetaViaApi } from "../integrations/convex";
 
 function extractFileName(url: string): string {
   // クエリやフラグメントを除去
@@ -19,12 +20,17 @@ function extractFileName(url: string): string {
 // ファイル名抽出ステップ
 const extractFileNameStep = createStep({
   id: "extractFileName",
-  inputSchema: z.object({ url: z.string() }),
-  outputSchema: z.object({ url: z.string(), fileName: z.string() }),
+  inputSchema: z.object({ url: z.string(), pdfId: z.string() }),
+  outputSchema: z.object({
+    url: z.string(),
+    fileName: z.string(),
+    pdfId: z.string(),
+  }),
   execute: async ({ inputData }) => {
     return {
       url: inputData.url,
       fileName: extractFileName(inputData.url),
+      pdfId: inputData.pdfId,
     };
   },
 });
@@ -32,19 +38,24 @@ const extractFileNameStep = createStep({
 // 1. RAG検索ステップ
 const searchRagStep = createStep({
   id: "searchRag",
-  inputSchema: z.object({ url: z.string(), fileName: z.string() }),
+  inputSchema: z.object({
+    url: z.string(),
+    fileName: z.string(),
+    pdfId: z.string(),
+  }),
   outputSchema: z.object({
     url: z.string(),
     fileName: z.string(),
     exists: z.boolean(),
+    pdfId: z.string(),
   }),
   execute: async (ctx) => {
-    const { url, fileName } = ctx.inputData;
+    const { url, fileName, pdfId } = ctx.inputData;
     const res = await ragSearchTool.execute({
       context: { query: "", fileName, topK: 10 },
       runtimeContext: ctx.runtimeContext,
     });
-    return { url, fileName, exists: (res.results?.length ?? 0) > 0 };
+    return { url, fileName, exists: (res.results?.length ?? 0) > 0, pdfId };
   },
 });
 
@@ -55,23 +66,23 @@ const downloadStep = createStep({
     url: z.string(),
     fileName: z.string(),
     exists: z.boolean(),
+    pdfId: z.string(),
   }),
   outputSchema: z.object({
     url: z.string(),
     fileName: z.string(),
     exists: z.boolean(),
     filePath: z.string(),
+    pdfId: z.string(),
   }),
   execute: async (ctx) => {
-    const { url, fileName, exists } = ctx.inputData;
-    if (exists) {
-      return { url, fileName, exists, filePath: "" };
-    }
+    const { url, fileName, pdfId } = ctx.inputData;
+    // exists判定を無視して常にダウンロード
     const res = await downloadPdfTool.execute({
       context: { url },
       runtimeContext: ctx.runtimeContext,
     });
-    return { url, fileName, exists, filePath: res.filePath };
+    return { url, fileName, exists: false, filePath: res.filePath, pdfId };
   },
 });
 
@@ -83,6 +94,7 @@ const addRagStep = createStep({
     fileName: z.string(),
     exists: z.boolean(),
     filePath: z.string(),
+    pdfId: z.string(),
   }),
   outputSchema: z.object({
     url: z.string(),
@@ -90,17 +102,23 @@ const addRagStep = createStep({
     exists: z.boolean(),
     filePath: z.string(),
     success: z.boolean(),
+    pdfId: z.string(),
   }),
   execute: async (ctx) => {
-    const { url, fileName, exists, filePath } = ctx.inputData;
-    if (exists || !filePath) {
-      return { url, fileName, exists, filePath, success: false };
-    }
+    const { url, fileName, filePath, pdfId } = ctx.inputData;
+    // exists判定を無視して常にRAG追加
     const res = await addRagTool.execute({
       context: { filePath },
       runtimeContext: ctx.runtimeContext,
     });
-    return { url, fileName, exists, filePath, success: res.success };
+    return {
+      url,
+      fileName,
+      exists: false,
+      filePath,
+      success: res.success,
+      pdfId,
+    };
   },
 });
 
@@ -113,32 +131,87 @@ const summarizeStep = createStep({
     exists: z.boolean(),
     filePath: z.string(),
     success: z.boolean(),
+    pdfId: z.string(),
   }),
-  outputSchema: z.object({ url: z.string(), summary: z.string() }),
+  outputSchema: z.object({
+    url: z.string(),
+    summary: z.string(),
+    keywords: z.array(z.string()),
+    pdfId: z.string(),
+  }),
   execute: async (ctx) => {
-    const { url, fileName, exists, filePath, success } = ctx.inputData;
-    if (exists) {
-      return { url, summary: "すでにRAGに登録済みです。" };
-    } else if (!filePath || !success) {
-      return { url, summary: "PDFの追加に失敗しました。" };
+    const { url, fileName, filePath, success, pdfId } = ctx.inputData;
+    // exists判定を無視して常に要約
+    if (!filePath || !success) {
+      return { url, summary: "PDFの追加に失敗しました。", pdfId };
     } else {
-      const res = await pdfAgent.generate(
-        `${fileName} の内容を要約してください`
+      const summaryRes = await pdfAgent.generate(
+        `${fileName} の内容を要約してください。`
       );
-      return { url, summary: res.text };
+      const keywordsRes = await pdfAgent.generate(
+        `${fileName} の内容に関連するキーワードを5つ以上抽出し、カンマ区切りで出力してください。`
+      );
+      const keywords = keywordsRes.text
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean); // 例: 日本語カンマ区切り対応
+
+      return { url, summary: summaryRes.text, keywords, pdfId };
     }
+  },
+});
+
+// ConvexへRAGメタ情報を保存するステップ
+const saveRagMetaStep = createStep({
+  id: "saveRagMeta",
+  inputSchema: z.object({
+    url: z.string(),
+    fileName: z.string(),
+    exists: z.boolean(),
+    filePath: z.string(),
+    success: z.boolean(),
+    summary: z.string(),
+    keywords: z.array(z.string()),
+    pdfId: z.string(),
+  }),
+  outputSchema: z.object({
+    url: z.string(),
+    summary: z.string(),
+    pdfId: z.string(),
+  }),
+  execute: async (ctx) => {
+    try {
+      await updatePdfRagMetaViaApi({
+        pdfId: ctx.inputData.pdfId,
+        ragSummary: ctx.inputData.summary,
+        ragKeywords: ctx.inputData.keywords,
+        lastRagUpdatedAt: Date.now(),
+      });
+    } catch (e) {
+      console.error("Convex連携エラー", e);
+    }
+    return {
+      url: ctx.inputData.url,
+      summary: ctx.inputData.summary,
+      pdfId: ctx.inputData.pdfId,
+    };
   },
 });
 
 // メインワークフロー
 export const pdfRagWorkflow = createWorkflow({
   id: "pdf-rag-workflow",
-  inputSchema: z.object({ url: z.string() }),
-  outputSchema: z.object({ url: z.string(), summary: z.string() }),
+  inputSchema: z.object({ url: z.string(), pdfId: z.string() }),
+  outputSchema: z.object({
+    url: z.string(),
+    summary: z.string(),
+    pdfId: z.string(),
+  }),
 })
   .then(extractFileNameStep)
   .then(searchRagStep)
   .then(downloadStep)
   .then(addRagStep)
   .then(summarizeStep)
+  .then(saveRagMetaStep)
   .commit();

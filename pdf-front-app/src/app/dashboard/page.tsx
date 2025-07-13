@@ -114,14 +114,19 @@ function PdfUploadForm({ onUploaded }: { onUploaded: () => void }) {
   );
 }
 
-function PdfList({ refreshKey }: { refreshKey: number }) {
+function PdfList({
+  refreshKey,
+  selectedPdfId,
+  setSelectedPdfId,
+}: {
+  refreshKey: number;
+  selectedPdfId: Id<"pdfs"> | null;
+  setSelectedPdfId: (id: Id<"pdfs">) => void;
+}) {
   const pdfs = useQuery(api.tasks.listPdfs, {});
-
-  // 署名付きURLをwindow.openで開くだけ
   const handleDownload = (url: string) => {
     window.open(url, "_blank");
   };
-
   return (
     <Card className="max-w-xl mx-auto">
       <CardBody>
@@ -135,19 +140,47 @@ function PdfList({ refreshKey }: { refreshKey: number }) {
         ) : (
           <ul className="space-y-2">
             {pdfs.map((pdf: any) => (
-              <li key={pdf._id} className="flex items-center gap-2">
-                <DocumentTextIcon className="h-5 w-5 text-blue-600" />
-                <span className="flex-1">{pdf.fileName}</span>
-                <Button
-                  size="sm"
-                  variant="bordered"
-                  onClick={() => handleDownload(pdf.url)}
-                >
-                  ダウンロード
-                </Button>
-                <span className="text-gray-400 text-xs">
-                  {new Date(pdf.createdAt).toLocaleString()}
-                </span>
+              <li
+                key={pdf._id}
+                className="flex flex-col gap-1 border-b pb-2 mb-2"
+              >
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={selectedPdfId === pdf._id ? "solid" : "light"}
+                    onClick={() => setSelectedPdfId(pdf._id as Id<"pdfs">)}
+                    className="flex-1 justify-start"
+                  >
+                    <DocumentTextIcon className="h-5 w-5 text-blue-600 mr-2" />
+                    {pdf.fileName}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="bordered"
+                    onClick={() => handleDownload(pdf.url)}
+                  >
+                    ダウンロード
+                  </Button>
+                  <span className="text-gray-400 text-xs">
+                    {new Date(pdf.createdAt).toLocaleString()}
+                  </span>
+                </div>
+                <div className="ml-8 mt-1 text-xs text-gray-600">
+                  <span className="font-semibold">要約:</span>{" "}
+                  {pdf.ragSummary ? (
+                    pdf.ragSummary
+                  ) : (
+                    <span className="text-gray-400">（解析中...）</span>
+                  )}
+                </div>
+                <div className="ml-8 text-xs text-gray-600">
+                  <span className="font-semibold">キーワード:</span>{" "}
+                  {pdf.ragKeywords && pdf.ragKeywords.length > 0 ? (
+                    pdf.ragKeywords.join(", ")
+                  ) : (
+                    <span className="text-gray-400">（解析中...）</span>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -157,14 +190,23 @@ function PdfList({ refreshKey }: { refreshKey: number }) {
   );
 }
 
-function ChatSection() {
-  // スレッド一覧・作成
-  const threads = useQuery(api.tasks.listThreads, {});
+function ChatSection({ pdfId }: { pdfId: Id<"pdfs"> | null }) {
+  if (!pdfId) {
+    return (
+      <Card className="max-w-2xl mx-auto mt-12">
+        <CardBody>
+          <div className="text-gray-400 text-center py-12">
+            PDFを選択してください
+          </div>
+        </CardBody>
+      </Card>
+    );
+  }
+  const threads = useQuery(api.tasks.listThreads, { pdfId });
   const createThread = useMutation(api.tasks.createThread);
   const [newThreadTitle, setNewThreadTitle] = useState("");
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  // メッセージ送信・取得
   const messages = useQuery(
     api.tasks.listMessages,
     selectedThread ? { threadId: selectedThread as Id<"threads"> } : "skip"
@@ -173,22 +215,18 @@ function ChatSection() {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const messageInputRef = useRef<HTMLInputElement>(null);
-
-  // スレッド作成
   const handleCreateThread = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newThreadTitle.trim()) return;
     setCreating(true);
     try {
-      const id = await createThread({ title: newThreadTitle });
+      const id = await createThread({ title: newThreadTitle, pdfId });
       setNewThreadTitle("");
       setSelectedThread(id);
     } finally {
       setCreating(false);
     }
   };
-
-  // メッセージ送信
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || !selectedThread) return;
@@ -204,7 +242,6 @@ function ChatSection() {
       setSending(false);
     }
   };
-
   return (
     <Card className="max-w-2xl mx-auto mt-12">
       <CardBody>
@@ -302,15 +339,14 @@ function ChatSection() {
 
 export default function Dashboard() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedPdfId, setSelectedPdfId] = useState<Id<"pdfs"> | null>(null);
   const { isLoading, isAuthenticated } = useStoreUserEffect();
-
   if (isLoading) {
     return <div>Loading...</div>;
   }
   if (!isAuthenticated) {
     return <div>認証が必要です。サインインしてください。</div>;
   }
-
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
@@ -318,8 +354,12 @@ export default function Dashboard() {
         <Header />
         <main className="flex-1 p-8 overflow-y-auto">
           <PdfUploadForm onUploaded={() => setRefreshKey((k) => k + 1)} />
-          <PdfList refreshKey={refreshKey} />
-          <ChatSection />
+          <PdfList
+            refreshKey={refreshKey}
+            selectedPdfId={selectedPdfId}
+            setSelectedPdfId={setSelectedPdfId}
+          />
+          <ChatSection pdfId={selectedPdfId} />
         </main>
       </div>
     </div>
