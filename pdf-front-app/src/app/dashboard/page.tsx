@@ -191,18 +191,8 @@ function PdfList({
 }
 
 function ChatSection({ pdfId }: { pdfId: Id<"pdfs"> | null }) {
-  if (!pdfId) {
-    return (
-      <Card className="max-w-2xl mx-auto mt-12">
-        <CardBody>
-          <div className="text-gray-400 text-center py-12">
-            PDFを選択してください
-          </div>
-        </CardBody>
-      </Card>
-    );
-  }
-  const threads = useQuery(api.tasks.listThreads, { pdfId });
+  // pdfIdがnullでもuseQuery等のフックは必ず呼び出す
+  const threads = useQuery(api.tasks.listThreads, pdfId ? { pdfId } : "skip");
   const createThread = useMutation(api.tasks.createThread);
   const [newThreadTitle, setNewThreadTitle] = useState("");
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
@@ -225,6 +215,18 @@ function ChatSection({ pdfId }: { pdfId: Id<"pdfs"> | null }) {
       chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
     }
   }, [messages, aiMessageBuffer, aiStreaming]);
+
+  if (!pdfId) {
+    return (
+      <Card className="max-w-2xl mx-auto mt-12">
+        <CardBody>
+          <div className="text-gray-400 text-center py-12">
+            PDFを選択してください
+          </div>
+        </CardBody>
+      </Card>
+    );
+  }
 
   const handleCreateThread = async (e: React.FormEvent) => {
     e.preventDefault();
