@@ -52,7 +52,7 @@ const searchRagStep = createStep({
   execute: async (ctx) => {
     const { url, fileName, pdfId } = ctx.inputData;
     const res = await ragSearchTool.execute({
-      context: { query: "", fileName, topK: 10 },
+      context: { query: "", pdfId, topK: 10 }, // pdfIdで検索
       runtimeContext: ctx.runtimeContext,
     });
     return { url, fileName, exists: (res.results?.length ?? 0) > 0, pdfId };
@@ -108,7 +108,7 @@ const addRagStep = createStep({
     const { url, fileName, filePath, pdfId } = ctx.inputData;
     // exists判定を無視して常にRAG追加
     const res = await addRagTool.execute({
-      context: { filePath },
+      context: { filePath, pdfId }, // pdfIdを渡す
       runtimeContext: ctx.runtimeContext,
     });
     return {
@@ -136,20 +136,20 @@ const summarizeStep = createStep({
   outputSchema: z.object({
     url: z.string(),
     summary: z.string(),
-    keywords: z.array(z.string()),
+    keywords: z.array(z.string()), // 必須
     pdfId: z.string(),
   }),
   execute: async (ctx) => {
     const { url, fileName, filePath, success, pdfId } = ctx.inputData;
     // exists判定を無視して常に要約
     if (!filePath || !success) {
-      return { url, summary: "PDFの追加に失敗しました。", pdfId };
+      return { url, summary: "PDFの追加に失敗しました。", keywords: [], pdfId };
     } else {
       const summaryRes = await pdfAgent.generate(
-        `${fileName} の内容を要約してください。`
+        `resourceId: ${pdfId} の内容を要約してください。`
       );
       const keywordsRes = await pdfAgent.generate(
-        `${fileName} の内容に関連するキーワードを5つ以上抽出し、カンマ区切りで出力してください。`
+        `resourceId: ${pdfId} の内容に関連するキーワードを5つ以上抽出し、カンマ区切りで出力してください。`
       );
       const keywords = keywordsRes.text
         .split(",")

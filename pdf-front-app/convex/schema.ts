@@ -26,7 +26,7 @@ export default defineSchema({
     .index("by_user_pdf", ["userId", "pdfId"]),
   messages: defineTable({
     threadId: v.id("threads"),
-    userId: v.id("users"),
+    userId: v.string(),
     text: v.string(),
     createdAt: v.number(),
   }).index("by_thread", ["threadId"]),

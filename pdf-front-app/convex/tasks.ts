@@ -164,20 +164,31 @@ export const listThreads = query({
 
 // メッセージ送信
 export const sendMessage = mutation({
-  args: { threadId: v.id("threads"), text: v.string() },
+  args: {
+    threadId: v.id("threads"),
+    text: v.string(),
+    userId: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("認証が必要です");
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
-      )
-      .unique();
-    if (!user) throw new Error("ユーザーが見つかりません");
+    let userId: string;
+    if (args.userId) {
+      // AI応答など、明示的にuserIdが指定された場合
+      userId = args.userId;
+    } else {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity) throw new Error("認証が必要です");
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_token", (q) =>
+          q.eq("tokenIdentifier", identity.tokenIdentifier)
+        )
+        .unique();
+      if (!user) throw new Error("ユーザーが見つかりません");
+      userId = user._id;
+    }
     const id = await ctx.db.insert("messages", {
       threadId: args.threadId,
-      userId: user._id,
+      userId,
       text: args.text,
       createdAt: Date.now(),
     });

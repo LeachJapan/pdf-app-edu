@@ -19,6 +19,7 @@ export const addRagTool = createTool({
   inputSchema: z.object({
     filePath: z.string().describe("PDFファイルのパス"),
     title: z.string().optional().describe("ドキュメントのタイトル（任意）"),
+    pdfId: z.string().describe("PDFの一意ID").optional(),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -27,11 +28,15 @@ export const addRagTool = createTool({
     numPages: z.number().describe("PDFのページ数"),
   }),
   execute: async ({ context }) => {
-    return await addPdfToRag(context.filePath, context.title);
+    return await addPdfToRag(context.filePath, context.title, context.pdfId);
   },
 });
 
-const addPdfToRag = async (filePath: string, title?: string) => {
+const addPdfToRag = async (
+  filePath: string,
+  title?: string,
+  pdfId?: string
+) => {
   console.log("addPdfToRag");
   const pdfData = new Uint8Array(await fs.readFile(filePath));
   const fileName = path.basename(filePath);
@@ -126,6 +131,7 @@ const addPdfToRag = async (filePath: string, title?: string) => {
           page: pageNum,
           summary: chunk.metadata?.sectionSummary,
           keywords: chunk.metadata?.excerptKeywords,
+          pdfId, // ← 追加
         },
       ],
       ids: [id],
