@@ -1,42 +1,30 @@
 import { Mastra } from "@mastra/core/mastra";
 import { PinoLogger } from "@mastra/loggers";
-import { LibSQLStore, LibSQLVector } from "@mastra/libsql";
+import { UpstashStore, UpstashVector } from "@mastra/upstash";
 import { weatherWorkflow } from "./workflows/weather-workflow";
 import { weatherAgent } from "./agents/weather-agent";
 import { pdfAgent } from "./agents/pdf-agent";
 import { pdfRagWorkflow } from "./workflows/pdf-rag-workflow";
 import { geminiEmbeddingsDim } from "./models";
-import path from "path";
-import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// 永続DBファイルの絶対パスを指定
-const dbPath = "file:" + path.resolve(__dirname, "../../rag.db");
-
-// サーバー起動時に一度だけpdf_chunksインデックスを作成
-(async () => {
-  const store = new LibSQLVector({
-    connectionUrl: dbPath,
-  });
-  try {
-    await store.createIndex({
-      indexName: "pdf_chunks",
-      dimension: geminiEmbeddingsDim,
-    });
-    console.log("✅ pdf_chunks index created or already exists");
-  } catch (e) {
-    console.error("❌ createIndex error", e);
-  }
-})();
+// .envから取得
+const upstashUrl = process.env.UPSTASH_URL!;
+const upstashToken = process.env.UPSTASH_TOKEN!;
+export const vectorStore = new UpstashVector({
+  url: upstashUrl,
+  token: upstashToken,
+});
 
 export const mastra = new Mastra({
   workflows: { weatherWorkflow, pdfRagWorkflow },
   agents: { weatherAgent, pdfAgent },
-  storage: new LibSQLStore({
-    url: dbPath, // 永続DBを利用
+  storage: new UpstashStore({
+    url: upstashUrl,
+    token: upstashToken,
   }),
+  vectors: {
+    default: vectorStore,
+  },
   logger: new PinoLogger({
     name: "Mastra",
     level: "info",

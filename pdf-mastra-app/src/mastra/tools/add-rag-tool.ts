@@ -11,6 +11,7 @@ import {
   geminiFlash,
   dbPath,
 } from "../models";
+import { vectorStore } from "..";
 
 export const addRagTool = createTool({
   id: "add-rag",
@@ -82,11 +83,6 @@ const addPdfToRag = async (
   });
   console.log("chunking done");
 
-  // LibSQLVectorの初期化
-  const store = new LibSQLVector({
-    connectionUrl: dbPath, // 必ず絶対パスを使う
-  });
-
   // sectionからページ番号を抽出する関数
   function extractPageNumber(section?: string): number | undefined {
     if (!section) return undefined;
@@ -118,7 +114,7 @@ const addPdfToRag = async (
       keywords: chunk.metadata?.excerptKeywords,
     });
 
-    await store.upsert({
+    await vectorStore.upsert({
       indexName: "pdf_chunks",
       vectors: [embedding],
       metadata: [

@@ -2,6 +2,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { LibSQLVector } from "@mastra/libsql";
 import { geminiEmbeddings, dbPath } from "../models";
+import { vectorStore } from "..";
 
 export const ragSearchTool = createTool({
   id: "rag-search",
@@ -32,7 +33,6 @@ export const ragSearchTool = createTool({
     const queryVector = embeddingResult.embeddings[0];
 
     // 2. ベクトルDBから類似チャンクを検索
-    const store = new LibSQLVector({ connectionUrl: dbPath });
     // filter条件を組み立て
     let filter: any = undefined;
     if (context.pdfId) {
@@ -40,7 +40,7 @@ export const ragSearchTool = createTool({
     } else if (context.fileName) {
       filter = { fileName: context.fileName };
     }
-    const results = await store.query({
+    const results = await vectorStore.query({
       indexName: "pdf_chunks",
       queryVector,
       topK: context.topK,

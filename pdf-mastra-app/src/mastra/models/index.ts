@@ -18,7 +18,7 @@ export const geminiPro = google("gemini-1.5-pro-latest");
 export const geminiEmbeddings = google.textEmbeddingModel(
   "gemini-embedding-exp-03-07"
 );
-export const geminiEmbeddingsDim = 3072;
+export const geminiEmbeddingsDim = 1536;
 
 export const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY || "",
