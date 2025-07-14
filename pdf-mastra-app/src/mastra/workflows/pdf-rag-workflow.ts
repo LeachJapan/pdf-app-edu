@@ -186,6 +186,7 @@ const saveRagMetaStep = createStep({
         ragSummary: ctx.inputData.summary,
         ragKeywords: ctx.inputData.keywords,
         lastRagUpdatedAt: Date.now(),
+        apiKey: process.env.MASTRA_API_KEY!,
       });
     } catch (e) {
       console.error("Convex連携エラー", e);

@@ -190,7 +190,13 @@ function PdfList({
   );
 }
 
-function ChatSection({ pdfId }: { pdfId: Id<"pdfs"> | null }) {
+function ChatSection({
+  pdfId,
+  userId,
+}: {
+  pdfId: Id<"pdfs"> | null;
+  userId: Id<"users"> | null;
+}) {
   // pdfIdがnullでもuseQuery等のフックは必ず呼び出す
   const threads = useQuery(api.tasks.listThreads, pdfId ? { pdfId } : "skip");
   const createThread = useMutation(api.tasks.createThread);
@@ -230,7 +236,7 @@ function ChatSection({ pdfId }: { pdfId: Id<"pdfs"> | null }) {
 
   const handleCreateThread = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newThreadTitle.trim()) return;
+    if (!newThreadTitle.trim() || !userId) return;
     setCreating(true);
     try {
       const id = await createThread({ title: newThreadTitle, pdfId });
@@ -262,6 +268,7 @@ function ChatSection({ pdfId }: { pdfId: Id<"pdfs"> | null }) {
           pdfId, // ChatSectionのprops
           threadId: selectedThread,
         }),
+        credentials: "include",
       });
       if (!res.body) throw new Error("No response body");
       const reader = res.body.getReader();
@@ -423,7 +430,7 @@ function ChatSection({ pdfId }: { pdfId: Id<"pdfs"> | null }) {
 export default function Dashboard() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedPdfId, setSelectedPdfId] = useState<Id<"pdfs"> | null>(null);
-  const { isLoading, isAuthenticated } = useStoreUserEffect();
+  const { isLoading, isAuthenticated, userId } = useStoreUserEffect();
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -442,7 +449,7 @@ export default function Dashboard() {
             selectedPdfId={selectedPdfId}
             setSelectedPdfId={setSelectedPdfId}
           />
-          <ChatSection pdfId={selectedPdfId} />
+          <ChatSection pdfId={selectedPdfId} userId={userId} />
         </main>
       </div>
     </div>

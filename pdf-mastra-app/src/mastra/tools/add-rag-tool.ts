@@ -127,7 +127,7 @@ const addPdfToRag = async (
           page: pageNum,
           summary: chunk.metadata?.sectionSummary,
           keywords: chunk.metadata?.excerptKeywords,
-          pdfId, // ← 追加
+          pdfId,
         },
       ],
       ids: [id],

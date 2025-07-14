@@ -7,6 +7,8 @@ import { api } from "./_generated/api";
 export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("認証が必要です");
     return await ctx.storage.generateUploadUrl();
   },
 });
@@ -64,17 +66,23 @@ export const updatePdfRagMeta = mutation({
     ragKeywords: v.optional(v.array(v.string())),
     ragEmbedding: v.optional(v.array(v.float64())),
     lastRagUpdatedAt: v.optional(v.number()),
+    apiKey: v.optional(v.string()), // ← 追加
   },
   handler: async (ctx, args) => {
-    console.log("[updatePdfRagMeta] called", args);
+    // APIキー認証
+    if (args.apiKey !== process.env.MASTRA_API_KEY) {
+      throw new Error("APIキーが不正です");
+    }
+    // PDF存在チェック（必要なら所有者チェックも）
+    const pdf = await ctx.db.get(args.pdfId);
+    if (!pdf) throw new Error("PDFが見つかりません");
+
     await ctx.db.patch(args.pdfId, {
       ragSummary: args.ragSummary,
       ragKeywords: args.ragKeywords,
       ragEmbedding: args.ragEmbedding,
       lastRagUpdatedAt: args.lastRagUpdatedAt,
     });
-    const updated = await ctx.db.get(args.pdfId);
-    console.log("[updatePdfRagMeta] after patch", updated);
     return args.pdfId;
   },
 });
@@ -162,6 +170,17 @@ export const listThreads = query({
   },
 });
 
+// スレッド情報取得（所有権チェック付き）
+export const getThreadIfOwned = query({
+  args: { threadId: v.id("threads"), userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const thread = await ctx.db.get(args.threadId);
+    if (!thread) return null;
+    if (thread.userId !== args.userId) return null;
+    return thread;
+  },
+});
+
 // メッセージ送信
 export const sendMessage = mutation({
   args: {
@@ -200,10 +219,38 @@ export const sendMessage = mutation({
 export const listMessages = query({
   args: { threadId: v.id("threads") },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("認証が必要です");
+
+    // ユーザー取得
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier)
+      )
+      .unique();
+    if (!user) throw new Error("ユーザーが見つかりません");
+
+    // スレッドの所有権チェック
+    const thread = await ctx.db.get(args.threadId);
+    if (!thread) throw new Error("スレッドが見つかりません");
+    if (thread.userId !== user._id) throw new Error("権限がありません");
+
     return await ctx.db
       .query("messages")
       .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
       .order("asc")
       .collect();
+  },
+});
+
+export const getConvexUserId = query({
+  args: { clerkUserId: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", args.clerkUserId))
+      .unique();
+    return user ? user._id : null;
   },
 });

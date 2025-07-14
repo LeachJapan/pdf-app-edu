@@ -9,12 +9,14 @@ export async function updatePdfRagMetaViaApi({
   ragKeywords,
   ragEmbedding,
   lastRagUpdatedAt,
+  apiKey,
 }: {
   pdfId: string;
   ragSummary?: string;
   ragKeywords?: string[];
   ragEmbedding?: number[];
   lastRagUpdatedAt?: number;
+  apiKey: string;
 }) {
   const url = `${CONVEX_API_URL}/api/mutation`;
   const body = {
@@ -25,6 +27,7 @@ export async function updatePdfRagMetaViaApi({
       ragKeywords,
       ragEmbedding,
       lastRagUpdatedAt,
+      apiKey,
     },
     format: "json",
   };

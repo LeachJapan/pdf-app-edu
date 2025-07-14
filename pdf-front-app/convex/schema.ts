@@ -5,7 +5,10 @@ export default defineSchema({
   users: defineTable({
     name: v.string(),
     tokenIdentifier: v.string(),
-  }).index("by_token", ["tokenIdentifier"]),
+    clerkUserId: v.string(),
+  })
+    .index("by_token", ["tokenIdentifier"])
+    .index("by_clerkUserId", ["clerkUserId"]),
   pdfs: defineTable({
     userId: v.id("users"),
     fileName: v.string(),
