@@ -1,7 +1,8 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { LibSQLVector } from "@mastra/libsql";
-import { geminiEmbeddings } from "../models";
+import { geminiEmbeddings, dbPath } from "../models";
+import { vectorStore } from "..";
 
 export const ragSearchTool = createTool({
   id: "rag-search",
@@ -9,6 +10,7 @@ export const ragSearchTool = createTool({
   inputSchema: z.object({
     query: z.string().describe("検索クエリ"),
     fileName: z.string().optional().describe("対象PDFファイル名（任意）"),
+    pdfId: z.string().optional().describe("PDFの一意ID（任意）"),
     topK: z.number().optional().default(5),
   }),
   outputSchema: z.object({
@@ -31,12 +33,18 @@ export const ragSearchTool = createTool({
     const queryVector = embeddingResult.embeddings[0];
 
     // 2. ベクトルDBから類似チャンクを検索
-    const store = new LibSQLVector({ connectionUrl: "file:rag.db" });
-    const results = await store.query({
+    // filter条件を組み立て
+    let filter: any = undefined;
+    if (context.pdfId) {
+      filter = { pdfId: context.pdfId };
+    } else if (context.fileName) {
+      filter = { fileName: context.fileName };
+    }
+    const results = await vectorStore.query({
       indexName: "pdf_chunks",
       queryVector,
       topK: context.topK,
-      filter: context.fileName ? { fileName: context.fileName } : undefined,
+      filter,
     });
 
     // 3. 結果を整形して返す

@@ -5,7 +5,13 @@ import * as path from "path";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { MDocument } from "@mastra/rag";
 import { LibSQLVector } from "@mastra/libsql";
-import { geminiEmbeddings, geminiEmbeddingsDim, geminiFlash } from "../models";
+import {
+  geminiEmbeddings,
+  geminiEmbeddingsDim,
+  geminiFlash,
+  dbPath,
+} from "../models";
+import { vectorStore } from "..";
 
 export const addRagTool = createTool({
   id: "add-rag",
@@ -14,6 +20,7 @@ export const addRagTool = createTool({
   inputSchema: z.object({
     filePath: z.string().describe("PDFファイルのパス"),
     title: z.string().optional().describe("ドキュメントのタイトル（任意）"),
+    pdfId: z.string().describe("PDFの一意ID").optional(),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -22,11 +29,15 @@ export const addRagTool = createTool({
     numPages: z.number().describe("PDFのページ数"),
   }),
   execute: async ({ context }) => {
-    return await addPdfToRag(context.filePath, context.title);
+    return await addPdfToRag(context.filePath, context.title, context.pdfId);
   },
 });
 
-const addPdfToRag = async (filePath: string, title?: string) => {
+const addPdfToRag = async (
+  filePath: string,
+  title?: string,
+  pdfId?: string
+) => {
   console.log("addPdfToRag");
   const pdfData = new Uint8Array(await fs.readFile(filePath));
   const fileName = path.basename(filePath);
@@ -72,15 +83,6 @@ const addPdfToRag = async (filePath: string, title?: string) => {
   });
   console.log("chunking done");
 
-  // LibSQLVectorの初期化
-  const store = new LibSQLVector({
-    connectionUrl: "file:rag.db", // 必要に応じて変更
-  });
-  await store.createIndex({
-    indexName: "pdf_chunks",
-    dimension: geminiEmbeddingsDim, // Gemini埋め込みの次元数
-  });
-
   // sectionからページ番号を抽出する関数
   function extractPageNumber(section?: string): number | undefined {
     if (!section) return undefined;
@@ -112,7 +114,7 @@ const addPdfToRag = async (filePath: string, title?: string) => {
       keywords: chunk.metadata?.excerptKeywords,
     });
 
-    await store.upsert({
+    await vectorStore.upsert({
       indexName: "pdf_chunks",
       vectors: [embedding],
       metadata: [
@@ -125,6 +127,7 @@ const addPdfToRag = async (filePath: string, title?: string) => {
           page: pageNum,
           summary: chunk.metadata?.sectionSummary,
           keywords: chunk.metadata?.excerptKeywords,
+          pdfId,
         },
       ],
       ids: [id],

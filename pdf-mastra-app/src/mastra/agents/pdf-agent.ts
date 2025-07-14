@@ -75,4 +75,6 @@ export const pdfAgent = new Agent({
     ),
   },
   memory,
+  // ragSearchToolを使う際はpdfIdで検索するように（fileNameではなく）
+  // 例: await ragSearchTool.execute({ context: { query, pdfId } })
 });

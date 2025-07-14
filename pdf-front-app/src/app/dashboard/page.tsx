@@ -2,7 +2,7 @@
 
 import { UserButton, SignOutButton } from "@clerk/nextjs";
 import { Button, Card, CardBody, Input } from "@heroui/react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import {
@@ -114,14 +114,19 @@ function PdfUploadForm({ onUploaded }: { onUploaded: () => void }) {
   );
 }
 
-function PdfList({ refreshKey }: { refreshKey: number }) {
+function PdfList({
+  refreshKey,
+  selectedPdfId,
+  setSelectedPdfId,
+}: {
+  refreshKey: number;
+  selectedPdfId: Id<"pdfs"> | null;
+  setSelectedPdfId: (id: Id<"pdfs">) => void;
+}) {
   const pdfs = useQuery(api.tasks.listPdfs, {});
-
-  // 署名付きURLをwindow.openで開くだけ
   const handleDownload = (url: string) => {
     window.open(url, "_blank");
   };
-
   return (
     <Card className="max-w-xl mx-auto">
       <CardBody>
@@ -135,19 +140,47 @@ function PdfList({ refreshKey }: { refreshKey: number }) {
         ) : (
           <ul className="space-y-2">
             {pdfs.map((pdf: any) => (
-              <li key={pdf._id} className="flex items-center gap-2">
-                <DocumentTextIcon className="h-5 w-5 text-blue-600" />
-                <span className="flex-1">{pdf.fileName}</span>
-                <Button
-                  size="sm"
-                  variant="bordered"
-                  onClick={() => handleDownload(pdf.url)}
-                >
-                  ダウンロード
-                </Button>
-                <span className="text-gray-400 text-xs">
-                  {new Date(pdf.createdAt).toLocaleString()}
-                </span>
+              <li
+                key={pdf._id}
+                className="flex flex-col gap-1 border-b pb-2 mb-2"
+              >
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={selectedPdfId === pdf._id ? "solid" : "light"}
+                    onClick={() => setSelectedPdfId(pdf._id as Id<"pdfs">)}
+                    className="flex-1 justify-start"
+                  >
+                    <DocumentTextIcon className="h-5 w-5 text-blue-600 mr-2" />
+                    {pdf.fileName}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="bordered"
+                    onClick={() => handleDownload(pdf.url)}
+                  >
+                    ダウンロード
+                  </Button>
+                  <span className="text-gray-400 text-xs">
+                    {new Date(pdf.createdAt).toLocaleString()}
+                  </span>
+                </div>
+                <div className="ml-8 mt-1 text-xs text-gray-600">
+                  <span className="font-semibold">要約:</span>{" "}
+                  {pdf.ragSummary ? (
+                    pdf.ragSummary
+                  ) : (
+                    <span className="text-gray-400">（解析中...）</span>
+                  )}
+                </div>
+                <div className="ml-8 text-xs text-gray-600">
+                  <span className="font-semibold">キーワード:</span>{" "}
+                  {pdf.ragKeywords && pdf.ragKeywords.length > 0 ? (
+                    pdf.ragKeywords.join(", ")
+                  ) : (
+                    <span className="text-gray-400">（解析中...）</span>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -157,14 +190,19 @@ function PdfList({ refreshKey }: { refreshKey: number }) {
   );
 }
 
-function ChatSection() {
-  // スレッド一覧・作成
-  const threads = useQuery(api.tasks.listThreads, {});
+function ChatSection({
+  pdfId,
+  userId,
+}: {
+  pdfId: Id<"pdfs"> | null;
+  userId: Id<"users"> | null;
+}) {
+  // pdfIdがnullでもuseQuery等のフックは必ず呼び出す
+  const threads = useQuery(api.tasks.listThreads, pdfId ? { pdfId } : "skip");
   const createThread = useMutation(api.tasks.createThread);
   const [newThreadTitle, setNewThreadTitle] = useState("");
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  // メッセージ送信・取得
   const messages = useQuery(
     api.tasks.listMessages,
     selectedThread ? { threadId: selectedThread as Id<"threads"> } : "skip"
@@ -173,38 +211,100 @@ function ChatSection() {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const messageInputRef = useRef<HTMLInputElement>(null);
+  const [aiStreaming, setAiStreaming] = useState(false);
+  const [aiMessageBuffer, setAiMessageBuffer] = useState("");
+  const chatListRef = useRef<HTMLDivElement>(null);
 
-  // スレッド作成
+  // メッセージやAI応答が更新されたら自動スクロール
+  useEffect(() => {
+    if (chatListRef.current) {
+      chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+    }
+  }, [messages, aiMessageBuffer, aiStreaming]);
+
+  if (!pdfId) {
+    return (
+      <Card className="max-w-2xl mx-auto mt-12">
+        <CardBody>
+          <div className="text-gray-400 text-center py-12">
+            PDFを選択してください
+          </div>
+        </CardBody>
+      </Card>
+    );
+  }
+
   const handleCreateThread = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newThreadTitle.trim()) return;
+    if (!newThreadTitle.trim() || !userId) return;
     setCreating(true);
     try {
-      const id = await createThread({ title: newThreadTitle });
+      const id = await createThread({ title: newThreadTitle, pdfId });
       setNewThreadTitle("");
       setSelectedThread(id);
     } finally {
       setCreating(false);
     }
   };
-
-  // メッセージ送信
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || !selectedThread) return;
     setSending(true);
+    setAiStreaming(true);
+    setAiMessageBuffer("");
     try {
+      // 1. ユーザーメッセージをConvexに保存
       await sendMessage({
         threadId: selectedThread as Id<"threads">,
         text: message,
       });
+
+      // 2. MastraチャットAPIをSSEで呼び出し
+      const res = await fetch("/api/mastra-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          pdfId, // ChatSectionのprops
+          threadId: selectedThread,
+        }),
+        credentials: "include",
+      });
+      if (!res.body) throw new Error("No response body");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let aiText = "";
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        // SSE: data: ...\n\n で分割
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || "";
+        for (const part of parts) {
+          if (part.startsWith("data: ")) {
+            const chunk = part.replace(/^data: /, "");
+            aiText += chunk;
+            setAiMessageBuffer(aiText); // UIに即時反映
+          }
+        }
+      }
+      // 3. AI応答もConvexに保存（空でなければ）
+      if (aiText && aiText.trim()) {
+        await sendMessage({
+          threadId: selectedThread as Id<"threads">,
+          text: aiText,
+          userId: "AI", // AI応答はuserId: "AI" で保存
+        } as any); // 型エラー回避のためany（sendMessageの型がuserId未対応の場合）
+      }
       setMessage("");
       messageInputRef.current?.focus();
     } finally {
       setSending(false);
+      setAiStreaming(false);
     }
   };
-
   return (
     <Card className="max-w-2xl mx-auto mt-12">
       <CardBody>
@@ -249,7 +349,10 @@ function ChatSection() {
           {/* メッセージエリア */}
           <div className="flex-1 flex flex-col">
             <div className="font-bold mb-2">チャット</div>
-            <div className="flex-1 overflow-y-auto mb-2 max-h-64 border rounded p-2 bg-gray-50">
+            <div
+              className="flex-1 overflow-y-auto mb-2 max-h-64 border rounded p-2 bg-gray-50"
+              ref={chatListRef}
+            >
               {selectedThread === null ? (
                 <div className="text-gray-400 text-sm">
                   スレッドを選択してください
@@ -262,15 +365,39 @@ function ChatSection() {
                 <ul className="space-y-2">
                   {messages.map((msg: any) => (
                     <li key={msg._id} className="flex items-start gap-2">
-                      <span className="font-bold text-blue-600">
-                        {msg.userId.slice(-4)}
-                      </span>
-                      <span className="flex-1">{msg.text}</span>
-                      <span className="text-gray-400 text-xs">
-                        {new Date(msg.createdAt).toLocaleTimeString()}
-                      </span>
+                      {msg.userId === "AI" ? (
+                        <>
+                          <span className="font-bold text-purple-600">AI</span>
+                          <span className="flex-1 whitespace-pre-line bg-purple-50 rounded px-2 py-1">
+                            {msg.text}
+                          </span>
+                          <span className="text-gray-400 text-xs">
+                            {new Date(msg.createdAt).toLocaleTimeString()}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-bold text-blue-600">
+                            {msg.userId.slice(-4)}
+                          </span>
+                          <span className="flex-1">{msg.text}</span>
+                          <span className="text-gray-400 text-xs">
+                            {new Date(msg.createdAt).toLocaleTimeString()}
+                          </span>
+                        </>
+                      )}
                     </li>
                   ))}
+                  {/* AI応答ストリーミング中は仮メッセージを表示 */}
+                  {aiStreaming && aiMessageBuffer && (
+                    <li className="flex items-start gap-2">
+                      <span className="font-bold text-purple-600">AI</span>
+                      <span className="flex-1 whitespace-pre-line bg-purple-50 rounded px-2 py-1">
+                        {aiMessageBuffer}
+                      </span>
+                      <span className="text-gray-400 text-xs">...</span>
+                    </li>
+                  )}
                 </ul>
               )}
             </div>
@@ -302,15 +429,14 @@ function ChatSection() {
 
 export default function Dashboard() {
   const [refreshKey, setRefreshKey] = useState(0);
-  const { isLoading, isAuthenticated } = useStoreUserEffect();
-
+  const [selectedPdfId, setSelectedPdfId] = useState<Id<"pdfs"> | null>(null);
+  const { isLoading, isAuthenticated, userId } = useStoreUserEffect();
   if (isLoading) {
     return <div>Loading...</div>;
   }
   if (!isAuthenticated) {
     return <div>認証が必要です。サインインしてください。</div>;
   }
-
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
@@ -318,8 +444,12 @@ export default function Dashboard() {
         <Header />
         <main className="flex-1 p-8 overflow-y-auto">
           <PdfUploadForm onUploaded={() => setRefreshKey((k) => k + 1)} />
-          <PdfList refreshKey={refreshKey} />
-          <ChatSection />
+          <PdfList
+            refreshKey={refreshKey}
+            selectedPdfId={selectedPdfId}
+            setSelectedPdfId={setSelectedPdfId}
+          />
+          <ChatSection pdfId={selectedPdfId} userId={userId} />
         </main>
       </div>
     </div>
