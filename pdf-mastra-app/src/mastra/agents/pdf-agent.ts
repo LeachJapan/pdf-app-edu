@@ -7,6 +7,7 @@ import { githubRepoSearchTool } from "../tools/github-repo-search-tool";
 import { Memory } from "@mastra/memory";
 import { LibSQLVector } from "@mastra/libsql";
 import { HallucinationMetric } from "@mastra/evals/llm";
+import { vectorStore } from "../store";
 
 const memory = new Memory({
   options: {
@@ -29,9 +30,7 @@ const memory = new Memory({
     },
   },
   // semanticRecallで使うベクトルDB
-  vector: new LibSQLVector({
-    connectionUrl: "file:memory.db",
-  }),
+  vector: vectorStore,
   // semanticRecallで使うベクトルDBの埋め込みモデル
   embedder: geminiEmbeddings,
 });
