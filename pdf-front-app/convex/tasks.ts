@@ -272,6 +272,22 @@ export const addTokenUsageFromMastra = mutation({
   },
 });
 
+export const updateStripeCustomerId = mutation({
+  args: {
+    userId: v.id("users"),
+    stripeCustomerId: v.string(),
+    apiKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    if (args.apiKey !== process.env.MASTRA_API_KEY)
+      throw new Error("APIキーが不正です");
+    await ctx.db.patch(args.userId, {
+      stripeCustomerId: args.stripeCustomerId,
+    });
+    return true;
+  },
+});
+
 export const getUser = query({
   args: { userId: v.id("users"), apiKey: v.string() },
   handler: async (ctx, args) => {

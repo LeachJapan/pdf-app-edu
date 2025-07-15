@@ -272,10 +272,37 @@ function ChatSection({
         credentials: "include",
       });
       if (!res.ok) {
-        const errorText = await res.text();
+        let errorJson: any = {};
+        try {
+          errorJson = await res.json();
+        } catch {}
+        if (errorJson.checkoutUrl) {
+          addToast({
+            title: "有料プラン登録が必要です",
+            description:
+              errorJson.error ||
+              "無料枠を超えました。引き続き使うにはクレジットカード登録が必要です。",
+            color: "warning",
+            endContent: (
+              <Button
+                size="sm"
+                color="primary"
+                onClick={() => {
+                  window.location.href = errorJson.checkoutUrl;
+                }}
+              >
+                クレカ登録
+              </Button>
+            ),
+            timeout: 10000,
+          });
+          setSending(false);
+          setAiStreaming(false);
+          return;
+        }
         addToast({
           title: "エラー",
-          description: errorText,
+          description: errorJson.error || "エラーが発生しました",
           color: "danger",
         });
         setSending(false);

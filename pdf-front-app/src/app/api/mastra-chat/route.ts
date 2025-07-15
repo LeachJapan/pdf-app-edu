@@ -3,8 +3,12 @@ import { MastraClient } from "@mastra/client-js";
 import { getAuth } from "@clerk/nextjs/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../convex/_generated/api";
+import Stripe from "stripe";
 
-const MAX_FREE_TOKEN = 100000; // 無料枠上限
+const MAX_FREE_TOKEN = 1000; // 無料枠上限
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2025-06-30.basil",
+});
 
 export async function POST(req: NextRequest) {
   // Clerk認証
@@ -46,11 +50,43 @@ export async function POST(req: NextRequest) {
   const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const used = user?.tokenUsageByMonth?.[ym] ?? 0;
   const hasCard = user?.hasCard ?? false;
+  let stripeCustomerId: string = user?.stripeCustomerId ?? "";
 
   if (used >= MAX_FREE_TOKEN && !hasCard) {
+    // Stripe顧客IDがなければ新規作成
+    if (!stripeCustomerId || stripeCustomerId === "") {
+      const customer = await stripe.customers.create({
+        // Convexユーザーにemailがあれば渡す（なければundefined）
+        email: (user as any).email ?? undefined,
+        // name: user.name,
+      });
+      stripeCustomerId = customer.id;
+      // Convexに保存
+      await convex.mutation(api.tasks.updateStripeCustomerId, {
+        userId: convexUserId,
+        stripeCustomerId,
+        apiKey: process.env.MASTRA_API_KEY!,
+      });
+    }
+    // Checkout Session作成
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "subscription",
+      customer: stripeCustomerId,
+      line_items: [
+        {
+          price: process.env.STRIPE_SUBSCRIPTION_PRICE_ID!,
+        },
+      ],
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard?checkout=success`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard?checkout=cancel`,
+    });
     return new Response(
-      "無料枠を超えました。クレジットカードを登録してください。",
-      { status: 402 }
+      JSON.stringify({
+        error: "無料枠を超えました。有料プラン登録が必要です。",
+        checkoutUrl: session.url,
+      }),
+      { status: 402, headers: { "Content-Type": "application/json" } }
     );
   }
 
