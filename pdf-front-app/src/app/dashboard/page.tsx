@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
 import { useStoreUserEffect } from "../useStoreUserEffect";
 import { Id } from "../../../convex/_generated/dataModel";
+import { addToast } from "@heroui/react";
 
 function Sidebar() {
   return (
@@ -270,6 +271,17 @@ function ChatSection({
         }),
         credentials: "include",
       });
+      if (!res.ok) {
+        const errorText = await res.text();
+        addToast({
+          title: "エラー",
+          description: errorText,
+          color: "danger",
+        });
+        setSending(false);
+        setAiStreaming(false);
+        return;
+      }
       if (!res.body) throw new Error("No response body");
       const reader = res.body.getReader();
       const decoder = new TextDecoder();

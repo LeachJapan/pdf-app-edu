@@ -1,6 +1,6 @@
 "use client";
 
-import { HeroUIProvider } from "@heroui/react";
+import { HeroUIProvider, ToastProvider } from "@heroui/react";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ReactNode } from "react";
 import { ConvexReactClient } from "convex/react";
@@ -25,6 +25,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
       <HeroUIProvider>
+        <ToastProvider />
         <ConvexClientProvider>{children}</ConvexClientProvider>
       </HeroUIProvider>
     </ClerkProvider>

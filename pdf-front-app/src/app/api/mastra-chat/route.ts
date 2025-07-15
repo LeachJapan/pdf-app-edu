@@ -4,6 +4,8 @@ import { getAuth } from "@clerk/nextjs/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../convex/_generated/api";
 
+const MAX_FREE_TOKEN = 100000; // 無料枠上限
+
 export async function POST(req: NextRequest) {
   // Clerk認証
   const auth = getAuth(req);
@@ -35,6 +37,23 @@ export async function POST(req: NextRequest) {
     return new Response("権限がありません", { status: 403 });
   }
 
+  // Convexユーザー情報を取得
+  const user = await convex.query(api.tasks.getUser, {
+    userId: convexUserId,
+    apiKey: process.env.MASTRA_API_KEY!,
+  });
+  const now = new Date();
+  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const used = user?.tokenUsageByMonth?.[ym] ?? 0;
+  const hasCard = user?.hasCard ?? false;
+
+  if (used >= MAX_FREE_TOKEN && !hasCard) {
+    return new Response(
+      "無料枠を超えました。クレジットカードを登録してください。",
+      { status: 402 }
+    );
+  }
+
   const client = new MastraClient({
     baseUrl: process.env.MASTRA_API_URL || "http://localhost:4111",
   });
@@ -60,9 +79,51 @@ export async function POST(req: NextRequest) {
         return;
       }
       let buffer = "";
+      let lastChunk = "";
+      let lastUsage = null;
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (value) {
+          const chunkStr = new TextDecoder().decode(value);
+          console.log("[mastra-chat] chunk:", chunkStr); // ← ここで全出力
+          buffer += chunkStr;
+        }
+        if (done) {
+          // ストリーム終了時に最後のチャンクからusage情報を取得
+          try {
+            const chunks = buffer.split("\n").filter((chunk) => chunk.trim());
+            for (const chunk of chunks) {
+              // 例: e:{"finishReason":"stop","usage":{...}}
+              const jsonPart = chunk.replace(/^[a-z]:/, ""); // 先頭1文字+コロンを除去
+              try {
+                const obj = JSON.parse(jsonPart);
+                if (obj.usage) {
+                  lastUsage = obj.usage;
+                }
+              } catch (e) {
+                // JSONでなければ無視
+              }
+            }
+            // 最後に取得したusageを使う
+            if (lastUsage) {
+              const totalTokens =
+                (lastUsage.promptTokens || 0) +
+                (lastUsage.completionTokens || 0);
+              // Convexに加算
+              await convex.mutation(api.tasks.addTokenUsageFromMastra, {
+                userId: convexUserId,
+                tokens: totalTokens,
+                apiKey: process.env.MASTRA_API_KEY!,
+              });
+              console.log(
+                `[mastra-chat] トークン加算完了: ${totalTokens} tokens`
+              );
+            }
+          } catch (error) {
+            console.error("[mastra-chat] usage解析エラー:", error);
+          }
+          break;
+        }
         buffer += new TextDecoder().decode(value);
         // 0:"...AI返答..." の部分を都度抽出して送信
         const matches = buffer.match(/0:"([\s\S]*?)"/g);

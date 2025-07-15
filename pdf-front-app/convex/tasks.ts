@@ -254,3 +254,32 @@ export const getConvexUserId = query({
     return user ? user._id : null;
   },
 });
+
+export const addTokenUsageFromMastra = mutation({
+  args: { userId: v.id("users"), tokens: v.number(), apiKey: v.string() },
+  handler: async (ctx, args) => {
+    if (args.apiKey !== process.env.MASTRA_API_KEY) {
+      throw new Error("APIキーが不正です");
+    }
+    const user = await ctx.db.get(args.userId);
+    if (!user) throw new Error("ユーザーが見つかりません");
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const usage = user.tokenUsageByMonth ?? {};
+    usage[ym] = (usage[ym] ?? 0) + args.tokens;
+    await ctx.db.patch(args.userId, { tokenUsageByMonth: usage });
+    return usage[ym];
+  },
+});
+
+export const getUser = query({
+  args: { userId: v.id("users"), apiKey: v.string() },
+  handler: async (ctx, args) => {
+    if (args.apiKey !== process.env.MASTRA_API_KEY) {
+      throw new Error("APIキーが不正です");
+    }
+    const user = await ctx.db.get(args.userId);
+    if (!user) throw new Error("ユーザーが見つかりません");
+    return user;
+  },
+});

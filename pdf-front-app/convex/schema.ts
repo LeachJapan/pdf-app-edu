@@ -6,6 +6,9 @@ export default defineSchema({
     name: v.string(),
     tokenIdentifier: v.string(),
     clerkUserId: v.string(),
+    tokenUsageByMonth: v.optional(v.record(v.string(), v.number())), // 月ごとのトークン数
+    stripeCustomerId: v.optional(v.string()), // Stripe顧客ID
+    hasCard: v.optional(v.boolean()), // クレカ登録済みか
   })
     .index("by_token", ["tokenIdentifier"])
     .index("by_clerkUserId", ["clerkUserId"]),
