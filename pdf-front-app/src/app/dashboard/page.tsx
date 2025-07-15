@@ -141,11 +141,9 @@ function PdfUploadForm({ onUploaded }: { onUploaded: () => void }) {
 }
 
 function PdfList({
-  refreshKey,
   selectedPdfId,
   setSelectedPdfId,
 }: {
-  refreshKey: number;
   selectedPdfId: Id<"pdfs"> | null;
   setSelectedPdfId: (id: Id<"pdfs">) => void;
 }) {
@@ -516,7 +514,6 @@ export default function Dashboard() {
         <main className="flex-1 p-8 overflow-y-auto">
           <PdfUploadForm onUploaded={() => {}} />
           <PdfList
-            refreshKey={0}
             selectedPdfId={selectedPdfId}
             setSelectedPdfId={setSelectedPdfId}
           />
