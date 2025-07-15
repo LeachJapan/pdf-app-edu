@@ -1,8 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
-import { LibSQLVector } from "@mastra/libsql";
-import { geminiEmbeddings, dbPath } from "../models";
-import { vectorStore } from "..";
+import { geminiEmbeddings } from "../models";
+import { vectorStore } from "../store";
 
 export const ragSearchTool = createTool({
   id: "rag-search",

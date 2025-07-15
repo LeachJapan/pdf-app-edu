@@ -4,14 +4,8 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { MDocument } from "@mastra/rag";
-import { LibSQLVector } from "@mastra/libsql";
-import {
-  geminiEmbeddings,
-  geminiEmbeddingsDim,
-  geminiFlash,
-  dbPath,
-} from "../models";
-import { vectorStore } from "..";
+import { geminiEmbeddings, geminiFlash } from "../models";
+import { vectorStore } from "../store";
 
 export const addRagTool = createTool({
   id: "add-rag",
