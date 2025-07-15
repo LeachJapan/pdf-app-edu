@@ -14,6 +14,27 @@ import { useStoreUserEffect } from "../useStoreUserEffect";
 import { Id } from "../../../convex/_generated/dataModel";
 import { addToast } from "@heroui/react";
 
+// 型定義を追加
+
+type PdfType = {
+  _id: string;
+  fileName: string;
+  url: string | null;
+  createdAt: number;
+  ragSummary?: string;
+  ragKeywords?: string[];
+};
+type ThreadType = {
+  _id: string;
+  title: string;
+};
+type MessageType = {
+  _id: string;
+  userId: string;
+  text: string;
+  createdAt: number;
+};
+
 function Sidebar() {
   return (
     <aside className="w-64 bg-white border-r h-full flex flex-col p-6 gap-6">
@@ -85,8 +106,14 @@ function PdfUploadForm({ onUploaded }: { onUploaded: () => void }) {
       await savePdf({ storageId, fileName: file.name });
       fileInputRef.current.value = "";
       onUploaded();
-    } catch (err: any) {
-      setError(err.message || "アップロードに失敗しました");
+    } catch (err: unknown) {
+      if (err && typeof err === "object" && "message" in err) {
+        setError(
+          (err as { message?: string }).message || "アップロードに失敗しました"
+        );
+      } else {
+        setError("アップロードに失敗しました");
+      }
     } finally {
       setUploading(false);
     }
@@ -138,7 +165,7 @@ function PdfList({
           </div>
         ) : (
           <ul className="space-y-2">
-            {pdfs.map((pdf: any) => (
+            {pdfs.map((pdf: PdfType) => (
               <li
                 key={pdf._id}
                 className="flex flex-col gap-1 border-b pb-2 mb-2"
@@ -156,7 +183,7 @@ function PdfList({
                   <Button
                     size="sm"
                     variant="bordered"
-                    onClick={() => handleDownload(pdf.url)}
+                    onClick={() => handleDownload(pdf.url || "")}
                   >
                     ダウンロード
                   </Button>
@@ -270,7 +297,7 @@ function ChatSection({
         credentials: "include",
       });
       if (!res.ok) {
-        let errorJson: any = {};
+        let errorJson: Record<string, unknown> = {};
         try {
           errorJson = await res.json();
         } catch {}
@@ -278,15 +305,16 @@ function ChatSection({
           addToast({
             title: "有料プラン登録が必要です",
             description:
-              errorJson.error ||
-              "無料枠を超えました。引き続き使うにはクレジットカード登録が必要です。",
+              typeof errorJson.error === "string"
+                ? errorJson.error
+                : "無料枠を超えました。引き続き使うにはクレジットカード登録が必要です。",
             color: "warning",
             endContent: (
               <Button
                 size="sm"
                 color="primary"
                 onClick={() => {
-                  window.location.href = errorJson.checkoutUrl;
+                  window.location.href = errorJson.checkoutUrl as string;
                 }}
               >
                 クレカ登録
@@ -300,7 +328,10 @@ function ChatSection({
         }
         addToast({
           title: "エラー",
-          description: errorJson.error || "エラーが発生しました",
+          description:
+            typeof errorJson.error === "string"
+              ? errorJson.error
+              : "エラーが発生しました",
           color: "danger",
         });
         setSending(false);
@@ -333,7 +364,7 @@ function ChatSection({
           threadId: selectedThread as Id<"threads">,
           text: aiText,
           userId: "AI", // AI応答はuserId: "AI" で保存
-        } as any); // 型エラー回避のためany（sendMessageの型がuserId未対応の場合）
+        }); // 型エラー回避のためanyは不要
       }
       setMessage("");
       messageInputRef.current?.focus();
@@ -366,7 +397,7 @@ function ChatSection({
               ) : threads.length === 0 ? (
                 <li className="text-gray-400 text-sm">スレッドなし</li>
               ) : (
-                threads.map((thread: any) => (
+                threads.map((thread: ThreadType) => (
                   <li key={thread._id}>
                     <Button
                       size="sm"
@@ -396,35 +427,39 @@ function ChatSection({
                 </div>
               ) : messages === undefined ? (
                 <div>読み込み中...</div>
-              ) : messages.length === 0 ? (
-                <div className="text-gray-400 text-sm">メッセージなし</div>
               ) : (
                 <ul className="space-y-2">
-                  {messages.map((msg: any) => (
-                    <li key={msg._id} className="flex items-start gap-2">
-                      {msg.userId === "AI" ? (
-                        <>
-                          <span className="font-bold text-purple-600">AI</span>
-                          <span className="flex-1 whitespace-pre-line bg-purple-50 rounded px-2 py-1">
-                            {msg.text}
-                          </span>
-                          <span className="text-gray-400 text-xs">
-                            {new Date(msg.createdAt).toLocaleTimeString()}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="font-bold text-blue-600">
-                            {msg.userId.slice(-4)}
-                          </span>
-                          <span className="flex-1">{msg.text}</span>
-                          <span className="text-gray-400 text-xs">
-                            {new Date(msg.createdAt).toLocaleTimeString()}
-                          </span>
-                        </>
-                      )}
-                    </li>
-                  ))}
+                  {messages.length === 0 ? (
+                    <li className="text-gray-400 text-sm">メッセージなし</li>
+                  ) : (
+                    messages.map((msg: MessageType) => (
+                      <li key={msg._id} className="flex items-start gap-2">
+                        {msg.userId === "AI" ? (
+                          <>
+                            <span className="font-bold text-purple-600">
+                              AI
+                            </span>
+                            <span className="flex-1 whitespace-pre-line bg-purple-50 rounded px-2 py-1">
+                              {msg.text}
+                            </span>
+                            <span className="text-gray-400 text-xs">
+                              {new Date(msg.createdAt).toLocaleTimeString()}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-bold text-blue-600">
+                              {msg.userId.slice(-4)}
+                            </span>
+                            <span className="flex-1">{msg.text}</span>
+                            <span className="text-gray-400 text-xs">
+                              {new Date(msg.createdAt).toLocaleTimeString()}
+                            </span>
+                          </>
+                        )}
+                      </li>
+                    ))
+                  )}
                   {/* AI応答ストリーミング中は仮メッセージを表示 */}
                   {aiStreaming && aiMessageBuffer && (
                     <li className="flex items-start gap-2">
