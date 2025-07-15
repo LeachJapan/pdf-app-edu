@@ -52,22 +52,40 @@ export async function POST(req: NextRequest) {
   const hasCard = user?.hasCard ?? false;
   let stripeCustomerId: string = user?.stripeCustomerId ?? "";
 
-  if (used >= MAX_FREE_TOKEN && !hasCard) {
-    // Stripe顧客IDがなければ新規作成
-    if (!stripeCustomerId || stripeCustomerId === "") {
-      const customer = await stripe.customers.create({
-        // Convexユーザーにemailがあれば渡す（なければundefined）
-        email: (user as any).email ?? undefined,
-        // name: user.name,
-      });
-      stripeCustomerId = customer.id;
-      // Convexに保存
-      await convex.mutation(api.tasks.updateStripeCustomerId, {
-        userId: convexUserId,
-        stripeCustomerId,
-        apiKey: process.env.MASTRA_API_KEY!,
-      });
+  // 既存のSubscriptionを検索
+  let subscriptionItemId: string = "";
+  const subscriptions = await stripe.subscriptions.list({
+    customer: stripeCustomerId,
+    status: "active",
+    expand: ["data.items"],
+  });
+  // 指定のPrice IDに紐づくSubscription Itemを探す
+  for (const sub of subscriptions.data) {
+    for (const item of sub.items.data) {
+      if (item.price.id === process.env.STRIPE_SUBSCRIPTION_PRICE_ID) {
+        subscriptionItemId = item.id;
+        break;
+      }
     }
+    if (subscriptionItemId) break;
+  }
+
+  const hasSubscription = subscriptionItemId !== "";
+
+  // Stripe顧客IDがなければ新規作成
+  if (!stripeCustomerId || stripeCustomerId === "") {
+    const customer = await stripe.customers.create({
+      email: (user as any).email ?? undefined,
+    });
+    stripeCustomerId = customer.id;
+    await convex.mutation(api.tasks.updateStripeCustomerId, {
+      userId: convexUserId,
+      stripeCustomerId,
+      apiKey: process.env.MASTRA_API_KEY!,
+    });
+  }
+
+  if (used >= MAX_FREE_TOKEN && !hasSubscription) {
     // Checkout Session作成
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -154,6 +172,22 @@ export async function POST(req: NextRequest) {
               console.log(
                 `[mastra-chat] トークン加算完了: ${totalTokens} tokens`
               );
+
+              // 従量課金: Usage Record送信
+              if (subscriptionItemId) {
+                // Stripe Meter Event APIで送信
+                await stripe.billing.meterEvents.create({
+                  event_name: "tokens",
+                  timestamp: Math.floor(Date.now() / 1000),
+                  payload: {
+                    stripe_customer_id: stripeCustomerId,
+                    value: totalTokens.toString(),
+                  },
+                });
+                console.log(
+                  `[mastra-chat] Stripe Meter Event送信: ${totalTokens} tokens`
+                );
+              }
             }
           } catch (error) {
             console.error("[mastra-chat] usage解析エラー:", error);
