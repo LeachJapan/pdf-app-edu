@@ -6,6 +6,7 @@ import { weatherAgent } from "./agents/weather-agent";
 import { pdfAgent } from "./agents/pdf-agent";
 import { pdfRagWorkflow } from "./workflows/pdf-rag-workflow";
 import { storage, vectorStore } from "./store";
+import { VercelDeployer } from "@mastra/deployer-vercel";
 
 export const mastra = new Mastra({
   workflows: { weatherWorkflow, pdfRagWorkflow },
@@ -18,4 +19,5 @@ export const mastra = new Mastra({
     name: "Mastra",
     level: "info",
   }),
+  deployer: new VercelDeployer(),
 });
