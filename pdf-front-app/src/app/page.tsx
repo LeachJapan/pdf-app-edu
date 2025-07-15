@@ -13,7 +13,7 @@ import { useStoreUserEffect } from "./useStoreUserEffect";
 import { SignedIn, SignedOut, SignUpButton, UserButton } from "@clerk/nextjs";
 
 export default function Home() {
-  const { isLoading, isAuthenticated } = useStoreUserEffect();
+  const { isLoading } = useStoreUserEffect();
   const router = useRouter();
 
   if (isLoading) return <div>Loading...</div>;

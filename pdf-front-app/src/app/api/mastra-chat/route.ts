@@ -152,9 +152,7 @@ export async function POST(req: NextRequest) {
                 if (obj.usage) {
                   lastUsage = obj.usage;
                 }
-              } catch (_) {
-                // JSONでなければ無視
-              }
+              } catch {} // JSONでなければ無視
             }
             // 最後に取得したusageを使う
             if (lastUsage) {

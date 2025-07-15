@@ -9,7 +9,6 @@ import {
   CloudArrowUpIcon,
   DocumentTextIcon,
 } from "@heroicons/react/24/outline";
-import { useRouter } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
 import { useStoreUserEffect } from "../useStoreUserEffect";
 import { Id } from "../../../convex/_generated/dataModel";
