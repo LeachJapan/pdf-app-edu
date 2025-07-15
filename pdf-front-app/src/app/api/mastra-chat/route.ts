@@ -49,7 +49,6 @@ export async function POST(req: NextRequest) {
   const now = new Date();
   const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const used = user?.tokenUsageByMonth?.[ym] ?? 0;
-  const hasCard = user?.hasCard ?? false;
   let stripeCustomerId: string = user?.stripeCustomerId ?? "";
 
   // 既存のSubscriptionを検索
@@ -75,7 +74,7 @@ export async function POST(req: NextRequest) {
   // Stripe顧客IDがなければ新規作成
   if (!stripeCustomerId || stripeCustomerId === "") {
     const customer = await stripe.customers.create({
-      email: (user as any).email ?? undefined,
+      email: (user as { email?: string }).email ?? undefined,
     });
     stripeCustomerId = customer.id;
     await convex.mutation(api.tasks.updateStripeCustomerId, {
@@ -133,7 +132,6 @@ export async function POST(req: NextRequest) {
         return;
       }
       let buffer = "";
-      let lastChunk = "";
       let lastUsage = null;
       while (true) {
         const { done, value } = await reader.read();
@@ -154,7 +152,7 @@ export async function POST(req: NextRequest) {
                 if (obj.usage) {
                   lastUsage = obj.usage;
                 }
-              } catch (e) {
+              } catch (_) {
                 // JSONでなければ無視
               }
             }

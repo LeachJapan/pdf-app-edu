@@ -1,6 +1,6 @@
 "use client";
 
-import { UserButton, SignOutButton } from "@clerk/nextjs";
+import { UserButton } from "@clerk/nextjs";
 import { Button, Card, CardBody, Input } from "@heroui/react";
 import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -38,7 +38,6 @@ function Sidebar() {
 }
 
 function Header() {
-  const router = useRouter();
   const { signOut } = useClerk();
   return (
     <header className="w-full h-16 bg-white border-b flex items-center justify-between px-8">
@@ -467,7 +466,6 @@ function ChatSection({
 }
 
 export default function Dashboard() {
-  const [refreshKey, setRefreshKey] = useState(0);
   const [selectedPdfId, setSelectedPdfId] = useState<Id<"pdfs"> | null>(null);
   const { isLoading, isAuthenticated, userId } = useStoreUserEffect();
   if (isLoading) {
@@ -482,9 +480,9 @@ export default function Dashboard() {
       <div className="flex-1 flex flex-col">
         <Header />
         <main className="flex-1 p-8 overflow-y-auto">
-          <PdfUploadForm onUploaded={() => setRefreshKey((k) => k + 1)} />
+          <PdfUploadForm onUploaded={() => {}} />
           <PdfList
-            refreshKey={refreshKey}
+            refreshKey={0}
             selectedPdfId={selectedPdfId}
             setSelectedPdfId={setSelectedPdfId}
           />

@@ -1,15 +1,6 @@
 "use client";
 
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Input,
-  Textarea,
-  Chip,
-  Divider,
-} from "@heroui/react";
+import { Button, Card, CardBody, Chip, Divider, Input } from "@heroui/react";
 import {
   CheckCircleIcon,
   DocumentTextIcon,
@@ -17,18 +8,9 @@ import {
   MagnifyingGlassIcon,
   SparklesIcon,
 } from "@heroicons/react/24/outline";
-import { useState } from "react";
-import {
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  SignUpButton,
-  UserButton,
-} from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useStoreUserEffect } from "./useStoreUserEffect";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { SignedIn, SignedOut, SignUpButton, UserButton } from "@clerk/nextjs";
 
 export default function Home() {
   const { isLoading, isAuthenticated } = useStoreUserEffect();
