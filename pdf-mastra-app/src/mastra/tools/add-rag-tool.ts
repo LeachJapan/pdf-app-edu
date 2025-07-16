@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import { execSync } from "child_process";
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -12,6 +13,22 @@ if (isProd) {
     "pdfjs-dist/build/pdf.worker.min.mjs",
     import.meta.url
   ).toString();
+  try {
+    console.log(
+      "grep -rn 'pdf.worker' /app/.mastra --include='*.ts' --include='*.tsx'"
+    );
+    // srcディレクトリ以下のTypeScriptファイルでpdf.workerを含む行を検索
+    const result = execSync(
+      'grep -rn "pdf.worker" /app/.mastra --include="*.ts" --include="*.tsx"'
+    );
+    console.log(result.toString());
+  } catch (e: any) {
+    if (e.stdout) {
+      console.log(e.stdout.toString());
+    } else {
+      console.log("No matches found.");
+    }
+  }
 }
 
 import { MDocument } from "@mastra/rag";
