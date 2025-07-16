@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
 
   if (used >= MAX_FREE_TOKEN && !hasSubscription) {
     // Checkout Session作成
-    const sessionParams: any = {
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ["card"],
       mode: "subscription",
       line_items: [
