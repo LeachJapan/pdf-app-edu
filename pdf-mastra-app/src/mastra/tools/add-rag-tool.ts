@@ -8,7 +8,7 @@ const isProd = process.env.NODE_ENV === "production";
 
 // fileスキーム付きで指定（必要な場合）
 if (isProd) {
-  const workerPath = path.resolve(process.cwd(), ".mastra/pdf.worker.mjs");
+  const workerPath = path.resolve(process.cwd(), "./pdf.worker.mjs");
   pdfjsLib.GlobalWorkerOptions.workerSrc = `file://${workerPath}`;
 }
 
