@@ -53,20 +53,23 @@ export async function POST(req: NextRequest) {
 
   // 既存のSubscriptionを検索
   let subscriptionItemId: string = "";
-  const subscriptions = await stripe.subscriptions.list({
-    customer: stripeCustomerId,
-    status: "active",
-    expand: ["data.items"],
-  });
-  // 指定のPrice IDに紐づくSubscription Itemを探す
-  for (const sub of subscriptions.data) {
-    for (const item of sub.items.data) {
-      if (item.price.id === process.env.STRIPE_SUBSCRIPTION_PRICE_ID) {
-        subscriptionItemId = item.id;
-        break;
+  let subscriptions;
+  if (stripeCustomerId && stripeCustomerId !== "") {
+    subscriptions = await stripe.subscriptions.list({
+      customer: stripeCustomerId,
+      status: "active",
+      expand: ["data.items"],
+    });
+    // 指定のPrice IDに紐づくSubscription Itemを探す
+    for (const sub of subscriptions.data) {
+      for (const item of sub.items.data) {
+        if (item.price.id === process.env.STRIPE_SUBSCRIPTION_PRICE_ID) {
+          subscriptionItemId = item.id;
+          break;
+        }
       }
+      if (subscriptionItemId) break;
     }
-    if (subscriptionItemId) break;
   }
 
   const hasSubscription = subscriptionItemId !== "";
@@ -86,10 +89,9 @@ export async function POST(req: NextRequest) {
 
   if (used >= MAX_FREE_TOKEN && !hasSubscription) {
     // Checkout Session作成
-    const session = await stripe.checkout.sessions.create({
+    const sessionParams: any = {
       payment_method_types: ["card"],
       mode: "subscription",
-      customer: stripeCustomerId,
       line_items: [
         {
           price: process.env.STRIPE_SUBSCRIPTION_PRICE_ID!,
@@ -97,7 +99,11 @@ export async function POST(req: NextRequest) {
       ],
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard?checkout=success`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard?checkout=cancel`,
-    });
+    };
+    if (stripeCustomerId && stripeCustomerId !== "") {
+      sessionParams.customer = stripeCustomerId;
+    }
+    const session = await stripe.checkout.sessions.create(sessionParams);
     return new Response(
       JSON.stringify({
         error: "無料枠を超えました。有料プラン登録が必要です。",
