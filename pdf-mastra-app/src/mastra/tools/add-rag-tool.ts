@@ -4,7 +4,10 @@ import * as fs from "fs/promises";
 import * as path from "path";
 
 // v3系のpdfjs-distをimport
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
+import * as pdfjsLibImport from "pdfjs-dist/legacy/build/pdf.js";
+const pdfjsLib: any = (pdfjsLibImport as any).getDocument
+  ? pdfjsLibImport
+  : (pdfjsLibImport as any).default;
 
 import { MDocument } from "@mastra/rag";
 import { geminiEmbeddings, geminiFlash } from "../models";
