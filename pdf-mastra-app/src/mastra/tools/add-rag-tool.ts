@@ -3,6 +3,17 @@ import { z } from "zod";
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+
+const isProd = process.env.NODE_ENV === "production";
+const workerPath = isProd
+  ? path.resolve("/app/.mastra/pdf.worker.mjs")
+  : path.resolve(process.cwd(), "pdf.worker.mjs");
+
+// fileスキーム付きで指定（必要な場合）
+if (isProd) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `file://${workerPath}`;
+}
+
 import { MDocument } from "@mastra/rag";
 import { geminiEmbeddings, geminiFlash } from "../models";
 import { vectorStore } from "../store";

@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "mastra dev",
     "build": "mastra build",
-    "start": "mastra start"
+    "start": "mastra start",
+    "postinstall": "cp node_modules/pdfjs-dist/build/pdf.worker.mjs .mastra/pdf.worker.mjs"
   },
   "keywords": [],
   "author": "",
