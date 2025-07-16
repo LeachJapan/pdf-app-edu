@@ -5,16 +5,11 @@ import * as path from "path";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 
 const isProd = process.env.NODE_ENV === "production";
-const workerPath = isProd
-  ? path.resolve("/app/.mastra/pdf.worker.mjs")
-  : path.resolve(process.cwd(), "pdf.worker.mjs");
 
 // fileスキーム付きで指定（必要な場合）
 if (isProd) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    process.env.NODE_ENV === "production"
-      ? "./.mastra/pdf.worker.mjs"
-      : "./pdf.worker.mjs";
+  const workerPath = path.resolve(process.cwd(), ".mastra/pdf.worker.mjs");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `file://${workerPath}`;
 }
 
 import { MDocument } from "@mastra/rag";
