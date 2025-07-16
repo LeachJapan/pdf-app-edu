@@ -8,7 +8,7 @@
     "dev": "mastra dev",
     "build": "mastra build",
     "start": "mastra start",
-    "postinstall": "cp node_modules/pdfjs-dist/build/pdf.worker.mjs .mastra/pdf.worker.mjs"
+    "postinstall": "mkdir -p /app/.mastra && cp node_modules/pdfjs-dist/build/pdf.worker.mjs /app/.mastra/pdf.worker.mjs"
   },
   "keywords": [],
   "author": "",
