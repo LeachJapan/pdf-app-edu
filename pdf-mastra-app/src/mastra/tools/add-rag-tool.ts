@@ -8,8 +8,9 @@ const isProd = process.env.NODE_ENV === "production";
 
 // fileスキーム付きで指定（必要な場合）
 if (isProd) {
-  const workerPath = path.resolve(process.cwd(), "./pdf.worker.mjs");
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `file://${workerPath}`;
+  pdfjsLib.GlobalWorkerOptions.workerPort = new Worker(
+    new URL("pdfjs-dist/legacy/build/pdf.worker.js", import.meta.url)
+  );
 }
 
 import { MDocument } from "@mastra/rag";
