@@ -11,7 +11,10 @@ const workerPath = isProd
 
 // fileスキーム付きで指定（必要な場合）
 if (isProd) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `file://${workerPath}`;
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    process.env.NODE_ENV === "production"
+      ? "./.mastra/pdf.worker.mjs"
+      : "./pdf.worker.mjs";
 }
 
 import { MDocument } from "@mastra/rag";
