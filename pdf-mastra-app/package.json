@@ -7,8 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "mastra dev",
     "build": "mastra build",
-    "start": "mastra start",
-    "postinstall": "mkdir -p .mastra && cp node_modules/pdfjs-dist/build/pdf.worker.mjs .mastra/pdf.worker.mjs"
+    "start": "mastra start"
   },
   "keywords": [],
   "author": "",
@@ -30,7 +29,7 @@
     "@mastra/rag": "^1.0.1",
     "@mastra/upstash": "^0.12.1",
     "@napi-rs/canvas": "^0.1.73",
-    "pdfjs-dist": "^4.7.76",
+    "pdfjs-dist": "^3.11.174",
     "zod": "^3.25.67"
   },
   "devDependencies": {

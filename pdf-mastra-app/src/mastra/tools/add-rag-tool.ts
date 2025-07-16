@@ -2,32 +2,9 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import * as fs from "fs/promises";
 import * as path from "path";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-import { execSync } from "child_process";
 
-const isProd = process.env.NODE_ENV === "production";
-
-// fileスキーム付きで指定（必要な場合）
-if (isProd) {
-  const workerPath = path.resolve(process.cwd(), ".mastra/pdf.worker.mjs");
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `file://${workerPath}`;
-  try {
-    console.log(
-      "grep -rn 'pdf.worker' /app/.mastra --include='*.ts' --include='*.tsx'"
-    );
-    // srcディレクトリ以下のTypeScriptファイルでpdf.workerを含む行を検索
-    const result = execSync(
-      'grep -rn "pdf.worker" /app/.mastra --include="*.ts" --include="*.tsx"'
-    );
-    console.log(result.toString());
-  } catch (e: any) {
-    if (e.stdout) {
-      console.log(e.stdout.toString());
-    } else {
-      console.log("No matches found.");
-    }
-  }
-}
+// v3系のpdfjs-distをimport
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
 
 import { MDocument } from "@mastra/rag";
 import { geminiEmbeddings, geminiFlash } from "../models";
@@ -62,6 +39,7 @@ const addPdfToRag = async (
   const pdfData = new Uint8Array(await fs.readFile(filePath));
   const fileName = path.basename(filePath);
 
+  // v3系: worker不要、getDocumentはそのまま使える
   const loadingTask = pdfjsLib.getDocument({ data: pdfData });
   const pdf = await loadingTask.promise;
   const numPages = pdf.numPages;
@@ -74,7 +52,8 @@ const addPdfToRag = async (
       includeMarkedContent: true,
       disableNormalization: false,
     });
-    const pageText = content.items
+    // 型エラー回避: item: any型でOK
+    const pageText = (content.items as any[])
       .map((item) => ("str" in item ? item.str : ""))
       .join("\n");
     markdown += `\n\n## Page ${i}\n\n${pageText}`;
