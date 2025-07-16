@@ -10,7 +10,7 @@ const isProd = process.env.NODE_ENV === "production";
 // fileスキーム付きで指定（必要な場合）
 if (isProd) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/build/pdf.worker.min.mjs",
+    "pdfjs-dist/legacy/build/pdf.worker",
     import.meta.url
   ).toString();
   try {
