@@ -29,7 +29,7 @@
     "@mastra/rag": "^1.0.1",
     "@mastra/upstash": "^0.12.1",
     "@napi-rs/canvas": "^0.1.73",
-    "pdfjs-dist": "^3.11.174",
+    "pdfjs-dist": "^4.2.67",
     "zod": "^3.25.67"
   },
   "devDependencies": {
