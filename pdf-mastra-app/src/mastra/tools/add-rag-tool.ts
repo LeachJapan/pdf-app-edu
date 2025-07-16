@@ -9,10 +9,8 @@ const isProd = process.env.NODE_ENV === "production";
 
 // fileスキーム付きで指定（必要な場合）
 if (isProd) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/legacy/build/pdf.worker",
-    import.meta.url
-  ).toString();
+  const workerPath = path.resolve(process.cwd(), ".mastra/pdf.worker.mjs");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `file://${workerPath}`;
   try {
     console.log(
       "grep -rn 'pdf.worker' /app/.mastra --include='*.ts' --include='*.tsx'"
